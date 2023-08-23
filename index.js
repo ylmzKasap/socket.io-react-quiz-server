@@ -20,7 +20,9 @@ const server = App();
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV ? 'http://localhost:3003' : 'https://socket-io-react-quiz-client.vercel.app/',
+    origin: process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:3003' 
+      : 'https://socket-io-react-quiz-client.vercel.app/',
     methods: ['GET', 'POST']
   }
 })
