@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -19,8 +20,8 @@ const server = App();
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3003',
-    methods: ['GET', 'POST ']
+    origin: process.env.NODE_ENV ? 'http://localhost:3003' : 'https://socket-io-react-quiz-client.vercel.app/',
+    methods: ['GET', 'POST']
   }
 })
 
