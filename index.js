@@ -11,7 +11,6 @@ const App = () => {
   const server = http.createServer(app);
   app.use(cors());
   app.use('/media', express.static(path.join(__dirname, 'public/images')));
-  app.use('/media', express.static(path.join(__dirname, 'public/sounds')));
 
   return server;
 }
