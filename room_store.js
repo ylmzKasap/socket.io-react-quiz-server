@@ -1,57 +1,104 @@
-/* abstract */ class RoomStore {
-  findRoom(id) {}
-  findRoomByPin(pin) {}
-  saveRoom(id, room) {}
-  deleteRoom(id) {}
-  addAnswer(room_id, answer) {}
-  findAllRooms() {}
-}
+const ROOM_TTL = 3 * 60 * 60;
 
-class InMemoryRoomStore extends RoomStore {
-  constructor() {
-    super();
-    this.rooms = new Map();
+class RedisRoomStore {
+  constructor(redisClient) {
+    this.redisClient = redisClient;
   }
 
-  findRoom(id) {
-    return this.rooms.get(id);
+  async findRoom(id) {
+    let answers = []
+    let room = await this.redisClient.hGetAll(`room:${id}`);
+
+    if (Object.keys(room).length !== 0) {
+      answers = await this.redisClient.lRange(`room:${id}:answers`, 0, -1);
+    }
+    
+    return Object.keys(room).length === 0 
+    ? undefined 
+    : {...room, answers: answers}
   }
 
-  findRoomByPin(pin) {
+  async deleteRoom(id) {
+    return this.redisClient.del(`room:${id}`)
+  }
+
+  async setRoundStarted(id, roundStarted) {
+    return this.redisClient.hSet(`room:${id}`, {roundStarted: `${roundStarted}`});
+  }
+
+  async setRoundEnded(id, roundEnded) {
+    return this.redisClient.hSet(`room:${id}`, {roundEnded: `${roundEnded}`});
+  }
+
+  async addAnswer(id, answer) {
+    return this.redisClient.rPush(`room:${id}:answers`, JSON.stringify(answer))
+  }
+
+  async findRoomByPin(pin) {
     let room;
-    for (let [id, roomObj] of this.rooms.entries()) {
-      if (roomObj.room_pin == pin) {
-        room = {
-          ...roomObj,
-          room_id: id
-        }
-        break;
+    let answers = [];
+    for await (const key of this.redisClient.scanIterator({
+      MATCH: 'room:*',
+    })) {
+      if (key.endsWith(':answers')) continue;
+      const value = await this.redisClient.hGetAll(key)
+      if (value.room_pin === pin) {
+        room = ({...value, room_id: key.split('room:')[1]})
+        break
       }
     }
-    return room;
+
+    if (room) {
+      answers = await this.redisClient.lRange(`room:${room.room_id}:answers`, 0, -1);
+    }
+
+    return room ? {...room, answers: answers} : undefined
   }
 
-  addAnswer(room_id, answer) {
-    const room = this.rooms.get(room_id);
-    this.rooms.set(room_id, {
-      ...room,
-      answers: [...room.answers, answer]
-    })
+  async restartRound(id) {
+    await this.redisClient
+      .multi()
+      .hSet(`room:${id}`, {roundEnded: 'false', roundStarted: 'false'})
+      .expire(`room:${id}`, ROOM_TTL)
+      .expire(`room:${id}:answers`, ROOM_TTL)
+      .exec();
+
+    return this.redisClient.del(`room:${id}:answers`)
   }
 
-  saveRoom(id, room) {
-    this.rooms.set(id, room);
-  }
-
-  deleteRoom(host_id) {
-    this.rooms.delete(host_id);
-  }
-
-  findAllRooms() {
-    return [...this.rooms.values()];
+  async saveRoom(id, pin, questions) {
+    this.redisClient
+      .multi()
+      .hSet(`room:${id}`, {
+        room_pin: pin, questions: JSON.stringify(questions), roundStarted: 'false', roundEnded: 'false'}
+      )
+      .expire(`room:${id}`, ROOM_TTL)
+      .expire(`room:${id}:answers`, ROOM_TTL)
+      .exec();
   }
 }
 
+/* interface Room {
+  [key: string] {
+    host_id: string;
+    room_pin: number;
+    questions: {
+      deck_id: string;
+      image_path: string;
+      question_id: string;
+      sound_path: string;
+      source_translation: string;
+      target_translation: string;
+      word_order: number
+    }
+    answers: {
+      question_id: string;
+      user_id: string;
+      isCorrect: Boolean;
+    }[];
+  }
+} */ 
+
 module.exports = {
-  InMemoryRoomStore
+  RedisRoomStore
 };
