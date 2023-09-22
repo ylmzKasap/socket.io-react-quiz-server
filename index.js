@@ -109,6 +109,10 @@ async function main() {
     const hostedRoom = await roomStore.findRoom(socket.userID);
     const user = await sessionStore.findSession(socket.sessionID)
     let joinedRoom;
+
+    if (!user) {
+      return socket.emit('room error', 'Session expired, refresh the page');
+    }
   
     if (user.joined_room_id) {
       const room = await roomStore.findRoom(user.joined_room_id);
