@@ -19,6 +19,7 @@ class RedisRoomStore {
   }
 
   async deleteRoom(id) {
+    this.redisClient.del(`room:${id}:answers`)
     return this.redisClient.del(`room:${id}`)
   }
 

@@ -60,8 +60,15 @@ async function main() {
     return roomUsers;
   }
 
-  async function registerUser(socket) {
-    const sessionID = socket.handshake.auth.sessionID;
+  const { RedisSessionStore } = require("./session_store");
+  const sessionStore = new RedisSessionStore(client);
+  
+  const { RedisRoomStore } = require("./room_store");
+  const roomStore = new RedisRoomStore(client);
+  
+  io.use(async (socket, next) => {
+    try {
+      const sessionID = socket.handshake.auth.sessionID;
     const sockets = await io.fetchSockets();
     if (sockets.some(s => s.sessionID === sessionID)) {
       throw new Error('Already connected');
@@ -87,17 +94,6 @@ async function main() {
       sessionID: socket.sessionID,
       userID: socket.userID
     });
-  }
-
-  const { RedisSessionStore } = require("./session_store");
-  const sessionStore = new RedisSessionStore(client);
-  
-  const { RedisRoomStore } = require("./room_store");
-  const roomStore = new RedisRoomStore(client);
-  
-  io.use(async (socket, next) => {
-    try {
-      await registerUser(socket);
     } catch (err) {
       next(new Error(err))
     }
