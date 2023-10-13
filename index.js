@@ -69,31 +69,31 @@ async function main() {
   io.use(async (socket, next) => {
     try {
       const sessionID = socket.handshake.auth.sessionID;
-    const sockets = await io.fetchSockets();
-    if (sockets.some(s => s.sessionID === sessionID)) {
-      throw new Error('Already connected');
-    }
-    if (sessionID) {
-      const session = await sessionStore.findSession(sessionID)
-      if (session) {
-        // User found, set online
-        socket.sessionID = sessionID;
-        socket.userID = session.userID;
-        socket.username = session.username;
-        
-        await sessionStore.setConnected(sessionID, 'true');
-        return;
+      const sockets = await io.fetchSockets();
+      if (sockets.some(s => s.sessionID === sessionID)) {
+        throw new Error('Already connected');
       }
-    }
+      if (sessionID) {
+        const session = await sessionStore.findSession(sessionID)
+        if (session) {
+          // User found, set online
+          socket.sessionID = sessionID;
+          socket.userID = session.userID;
+          socket.username = session.username;
+          
+          await sessionStore.setConnected(sessionID, 'true');
+          return next();
+        }
+      }
   
-    // Create a new user
-    socket.sessionID = randomId();
-    socket.userID = randomId();
-    await sessionStore.saveSession(socket.sessionID, socket.userID)
-    socket.emit("session", {
-      sessionID: socket.sessionID,
-      userID: socket.userID
-    });
+      // Create a new user
+      socket.sessionID = randomId();
+      socket.userID = randomId();
+      await sessionStore.saveSession(socket.sessionID, socket.userID)
+      socket.emit("session", {
+        sessionID: socket.sessionID,
+        userID: socket.userID
+      });
     } catch (err) {
       next(new Error(err))
     }
